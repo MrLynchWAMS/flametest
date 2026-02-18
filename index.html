@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Flame Test Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        .canvas-container {
+            position: relative;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 70%);
+            border-radius: 1rem;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        /* Flame Animation CSS */
+        .flame-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 100px;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        .flame-active {
+            opacity: 1;
+        }
+
+        .fire {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 100%;
+        }
+
+        .fire-particle {
+            position: absolute;
+            background-color: rgba(255, 200, 0, 0.7);
+            border-radius: 50%;
+            bottom: 0;
+            animation: rise 1s infinite ease-in;
+            filter: blur(2px);
+        }
+
+        @keyframes rise {
+            0% { transform: translateY(0) scale(1); opacity: 0.8; background: orangered; }
+            50% { background: yellow; }
+            100% { transform: translateY(-80px) scale(0.2); opacity: 0; background: white; }
+        }
+
+        /* Control Panel Styling */
+        .control-panel {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .element-btn {
+            transition: all 0.2s;
+        }
+        .element-btn:hover {
+            transform: translateY(-2px);
+        }
+        .element-btn.active {
+            ring-width: 2px;
+            ring-color: white;
+            border-color: white;
+        }
+
+        /* Tooltip/Legend */
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+    </style>
+</head>
+<body class="h-screen flex flex-col md:flex-row">
+
+    <!-- Sidebar Controls -->
+    <div class="w-full md:w-80 flex-shrink-0 control-panel p-6 flex flex-col gap-6 z-10 overflow-y-auto">
+        <div>
+            <h1 class="text-2xl font-bold text-white mb-2">Flame Test Lab</h1>
+            <p class="text-slate-400 text-sm">Select a metal salt to observe how its electrons behave when heated.</p>
+        </div>
+
+        <!-- Element Selection -->
+        <div class="space-y-3">
+            <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Select Element</h2>
+            
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="selectElement('Li')" id="btn-Li" class="element-btn active bg-slate-700 hover:bg-slate-600 p-3 rounded-lg flex items-center gap-3 border border-transparent">
+                    <span class="font-bold text-lg text-red-400">Li</span>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-300">Lithium</div>
+                        <div class="text-[10px] text-slate-500">Red (Low Energy)</div>
+                    </div>
+                </button>
+
+                <button onclick="selectElement('Na')" id="btn-Na" class="element-btn bg-slate-700 hover:bg-slate-600 p-3 rounded-lg flex items-center gap-3 border border-transparent">
+                    <span class="font-bold text-lg text-yellow-400">Na</span>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-300">Sodium</div>
+                        <div class="text-[10px] text-slate-500">Yellow (Medium)</div>
+                    </div>
+                </button>
+
+                <button onclick="selectElement('K')" id="btn-K" class="element-btn bg-slate-700 hover:bg-slate-600 p-3 rounded-lg flex items-center gap-3 border border-transparent">
+                    <span class="font-bold text-lg text-purple-400">K</span>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-300">Potassium</div>
+                        <div class="text-[10px] text-slate-500">Lilac (High Energy)</div>
+                    </div>
+                </button>
+
+                <button onclick="selectElement('Ca')" id="btn-Ca" class="element-btn bg-slate-700 hover:bg-slate-600 p-3 rounded-lg flex items-center gap-3 border border-transparent">
+                    <span class="font-bold text-lg text-orange-500">Ca</span>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-300">Calcium</div>
+                        <div class="text-[10px] text-slate-500">Orange (Med-Low)</div>
+                    </div>
+                </button>
+
+                <button onclick="selectElement('Sr')" id="btn-Sr" class="element-btn bg-slate-700 hover:bg-slate-600 p-3 rounded-lg flex items-center gap-3 border border-transparent">
+                    <span class="font-bold text-lg text-red-600">Sr</span>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-300">Strontium</div>
+                        <div class="text-[10px] text-slate-500">Red (Low Energy)</div>
+                    </div>
+                </button>
+
+                <button onclick="selectElement('Ba')" id="btn-Ba" class="element-btn bg-slate-700 hover:bg-slate-600 p-3 rounded-lg flex items-center gap-3 border border-transparent">
+                    <span class="font-bold text-lg text-green-400">Ba</span>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-300">Barium</div>
+                        <div class="text-[10px] text-slate-500">Green (Med-High)</div>
+                    </div>
+                </button>
+
+                <button onclick="selectElement('Cu')" id="btn-Cu" class="element-btn bg-slate-700 hover:bg-slate-600 p-3 rounded-lg flex items-center gap-3 border border-transparent col-span-2">
+                    <span class="font-bold text-lg text-teal-400">Cu</span>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-300">Copper (II)</div>
+                        <div class="text-[10px] text-slate-500">Blue-Green (High)</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="pt-4 border-t border-slate-700">
+            <button id="igniteBtn" class="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transform transition active:scale-95 flex justify-center items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.1.6-3"></path></svg>
+                APPLY HEAT
+            </button>
+        </div>
+
+        <!-- Info Box: Observation -->
+        <div class="bg-slate-800 rounded-lg p-3 text-sm space-y-1 border border-slate-700">
+            <h3 class="font-bold text-slate-200 uppercase text-xs tracking-wider">Observation</h3>
+            <p id="info-text" class="text-slate-400 leading-relaxed text-xs">
+                Select an element to begin.
+            </p>
+        </div>
+
+        <!-- Info Box: Explanation -->
+        <div class="bg-indigo-900/30 rounded-lg p-3 text-sm space-y-1 border border-indigo-500/30">
+            <h3 class="font-bold text-indigo-300 uppercase text-xs tracking-wider flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                Why is the gap this size?
+            </h3>
+            <p id="structure-text" class="text-indigo-200 leading-relaxed text-xs">
+                The atomic structure determines the gap.
+            </p>
+        </div>
+
+         <!-- Legend -->
+        <div class="mt-auto pt-4 space-y-2">
+            <div class="legend-item"><div class="legend-dot bg-red-500"></div> Proton (+ Nucleus)</div>
+            <div class="legend-item"><div class="legend-dot bg-blue-400"></div> Ground State Electron</div>
+            <div class="legend-item"><div class="legend-dot border-2 border-dashed border-white"></div> Excited State Level</div>
+        </div>
+    </div>
+
+    <!-- Main Canvas Area -->
+    <div class="flex-grow relative h-full bg-black flex flex-col">
+        
+        <!-- Header Overlay -->
+        <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none z-10">
+            <div>
+                <h2 id="display-symbol" class="text-6xl font-black text-white opacity-20 select-none">Li</h2>
+                <h3 id="display-name" class="text-2xl font-bold text-white opacity-40 select-none">Lithium</h3>
+            </div>
+            
+            <div class="bg-black/50 backdrop-blur-md rounded-lg p-3 border border-white/10 text-right">
+                <div class="text-xs text-slate-400 uppercase">Current State</div>
+                <div id="atom-state" class="text-lg font-bold text-green-400">Ground State</div>
+            </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="canvas-container w-full h-full relative">
+            <canvas id="atomCanvas"></canvas>
+            
+            <!-- Flame Element -->
+            <div id="flame" class="flame-container">
+                <div class="fire"></div>
+            </div>
+
+            <!-- Bunsen Burner Graphic (Static SVG) -->
+            <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-24 h-24 pointer-events-none">
+                 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="35" y="20" width="30" height="80" fill="#334155" /> <!-- Tube -->
+                    <rect x="25" y="90" width="50" height="10" fill="#1e293b" /> <!-- Base -->
+                    <path d="M35 20 L50 15 L65 20" stroke="#94a3b8" stroke-width="2" fill="none"/> <!-- Top rim -->
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Data ---
+        // jumpScale represents relative distance. High scale = High Energy = Blue/Purple. Low scale = Red.
+        const elements = {
+            Li: { 
+                name: "Lithium", 
+                protons: 3, 
+                shells: [2, 1], 
+                color: "#ff3333", // Crimson
+                jumpScale: 0.5,
+                gapName: "Small Gap",
+                desc: "The valence electron makes a SHORT jump. A short fall releases low-energy Red light.",
+                structureEx: "Lithium has only 3 protons. This weak nuclear pull keeps the energy levels relatively close together, resulting in a small gap."
+            },
+            Na: { 
+                name: "Sodium", 
+                protons: 11, 
+                shells: [2, 8, 1], 
+                color: "#ffcc00", // Yellow-Orange
+                jumpScale: 0.8,
+                gapName: "Medium Gap",
+                desc: "The valence electron jumps a MEDIUM distance. This releases medium-energy Yellow light.",
+                structureEx: "Sodium has more protons (11) pulling in, but also more shells pushing out. This specific tug-of-war creates a medium-sized energy gap."
+            },
+            K: { 
+                name: "Potassium", 
+                protons: 19, 
+                shells: [2, 8, 8, 1], 
+                color: "#d8b4fe", // Lilac
+                jumpScale: 1.4,
+                gapName: "Large Gap",
+                desc: "The electron makes a MASSIVE jump! The long fall releases high-energy Purple light.",
+                structureEx: "With 19 protons, the nucleus pulls hard! But the electron is far away in shell 4. This unique combination creates a huge energy gap for the jump."
+            },
+            Ca: { 
+                name: "Calcium", 
+                protons: 20, 
+                shells: [2, 8, 8, 2], 
+                color: "#ff6600", // Orange-Red
+                jumpScale: 0.6,
+                gapName: "Small-Med Gap",
+                desc: "Calcium electrons jump a bit further than Lithium, but less than Sodium. Result: Orange-Red.",
+                structureEx: "Calcium has 20 protons and 2 valence electrons. The extra crowding of electrons changes the stairs, resulting in a smaller gap than Potassium."
+            },
+            Sr: { 
+                name: "Strontium", 
+                protons: 38, 
+                shells: [2, 8, 18, 8, 2], 
+                color: "#ff0000", // Bright Red
+                jumpScale: 0.5,
+                gapName: "Small Gap",
+                desc: "Despite being a large atom, the energy gap for the jump is small, releasing Red light.",
+                structureEx: "Strontium is huge! Even though it has 38 protons, the outer electrons are so far away and shielded that the energy gap ends up being small."
+            },
+            Ba: { 
+                name: "Barium", 
+                protons: 56, 
+                shells: [2, 8, 18, 18, 8, 2], 
+                color: "#aaff00", // Apple Green
+                jumpScale: 1.0,
+                gapName: "Med-High Gap",
+                desc: "Barium electrons fall a significant distance, releasing higher energy Green light.",
+                structureEx: "Barium has 56 protons pulling very hard! This creates a stronger interaction than Strontium, pulling the energy levels apart to create a green gap."
+            },
+            Cu: { 
+                name: "Copper", 
+                protons: 29, 
+                shells: [2, 8, 18, 1], 
+                color: "#00ffcc", // Blue-Green
+                jumpScale: 1.2,
+                gapName: "High Energy Gap",
+                desc: "Copper electrons fall a long distance, releasing high-energy Blue-Green light.",
+                structureEx: "Copper is a transition metal with a complex core. Its 29 protons pull tightly on the shells, creating a large, high-energy gap."
+            }
+        };
+
+        let currentElement = 'Li';
+        let electrons = []; 
+        let photons = []; 
+        
+        // --- Canvas Setup ---
+        const canvas = document.getElementById('atomCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, centerX, centerY;
+
+        const NUCLEUS_RADIUS = 15;
+        const SHELL_SPACING = 35; 
+        const ELECTRON_RADIUS = 5;
+        const ORBIT_SPEED_BASE = 0.005;
+
+        function resize() {
+            const container = canvas.parentElement;
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            centerX = width / 2;
+            centerY = height / 2 - 40; 
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- Classes ---
+
+        class Electron {
+            constructor(shellIndex, angleOffset, isValence) {
+                this.shellIndex = shellIndex; 
+                this.baseRadius = (shellIndex + 1) * SHELL_SPACING + NUCLEUS_RADIUS;
+                this.angle = angleOffset;
+                this.speed = ORBIT_SPEED_BASE / (shellIndex + 1); 
+                this.isValence = isValence;
+                
+                this.state = 'ground'; 
+                this.currentRadius = this.baseRadius;
+                this.jumpProgress = 0;
+            }
+
+            update() {
+                this.angle += this.speed;
+
+                // Dynamic Jump Distance based on Element Energy
+                const jumpDist = SHELL_SPACING * 2 * elements[currentElement].jumpScale;
+
+                if (this.state === 'jumping') {
+                    this.jumpProgress += 0.05;
+                    if (this.jumpProgress >= 1) {
+                        this.jumpProgress = 1;
+                        this.state = 'excited';
+                        setTimeout(() => { this.fall(); }, 1000); 
+                    }
+                    // Ease out cubic for jump
+                    const ease = 1 - Math.pow(1 - this.jumpProgress, 3);
+                    this.currentRadius = this.baseRadius + (jumpDist * ease);
+                } 
+                else if (this.state === 'falling') {
+                    this.jumpProgress -= 0.08; // Fall faster than jump
+                    if (this.jumpProgress <= 0) {
+                        this.jumpProgress = 0;
+                        this.state = 'ground';
+                        this.emitPhoton();
+                        updateStatus("Ground State", "text-green-400");
+                    }
+                    const ease = 1 - Math.pow(1 - this.jumpProgress, 3);
+                    this.currentRadius = this.baseRadius + (jumpDist * ease);
+                }
+
+                this.x = centerX + Math.cos(this.angle) * this.currentRadius;
+                this.y = centerY + Math.sin(this.angle) * this.currentRadius;
+            }
+
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ELECTRON_RADIUS, 0, Math.PI * 2);
+                
+                if (this.isValence && this.state !== 'ground') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = elements[currentElement].color;
+                } else {
+                    ctx.fillStyle = '#60a5fa'; 
+                    ctx.shadowBlur = 0;
+                }
+                
+                ctx.fill();
+                ctx.shadowBlur = 0; 
+            }
+
+            jump() {
+                if (this.state === 'ground' && this.isValence) {
+                    this.state = 'jumping';
+                    updateStatus("Excited State!", "text-red-400");
+                }
+            }
+
+            fall() {
+                if (this.state === 'excited') {
+                    this.state = 'falling';
+                    updateStatus("Emitting Light...", elements[currentElement].color);
+                }
+            }
+
+            emitPhoton() {
+                photons.push(new Photon(this.x, this.y, elements[currentElement].color));
+                document.getElementById('flame').classList.remove('flame-active');
+            }
+        }
+
+        class Photon {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.life = 1.0;
+                this.velocity = {
+                    x: (Math.random() - 0.5) * 4,
+                    y: (Math.random() - 0.5) * 4
+                };
+                const angleToCenter = Math.atan2(centerY - y, centerX - x);
+                const escapeAngle = angleToCenter + Math.PI + (Math.random() * 0.5 - 0.25);
+                this.velocity.x = Math.cos(escapeAngle) * 6; // Faster photons
+                this.velocity.y = Math.sin(escapeAngle) * 6;
+            }
+
+            update() {
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.life -= 0.02;
+            }
+
+            draw(ctx) {
+                if (this.life <= 0) return;
+                
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                const tailX = this.x - (this.velocity.x * 3);
+                const tailY = this.y - (this.velocity.y * 3);
+                ctx.lineTo(tailX, tailY);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 4, 0, Math.PI*2);
+                ctx.fillStyle = "white";
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- Logic ---
+
+        function initAtom(elSymbol) {
+            electrons = [];
+            photons = [];
+            const data = elements[elSymbol];
+            
+            data.shells.forEach((count, shellIdx) => {
+                const isValenceShell = (shellIdx === data.shells.length - 1);
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 / count) * i;
+                    electrons.push(new Electron(shellIdx, angle, isValenceShell));
+                }
+            });
+
+            document.getElementById('display-symbol').innerText = elSymbol;
+            document.getElementById('display-name').innerText = data.name;
+            document.getElementById('info-text').innerText = data.desc;
+            document.getElementById('structure-text').innerText = data.structureEx;
+            
+            updateStatus("Ground State", "text-green-400");
+        }
+
+        function updateStatus(text, colorClass) {
+            const statusEl = document.getElementById('atom-state');
+            statusEl.innerText = text;
+            statusEl.className = `text-lg font-bold ${colorClass.startsWith('#') ? '' : colorClass}`;
+            if (colorClass.startsWith('#')) statusEl.style.color = colorClass;
+            else statusEl.style.color = '';
+        }
+
+        // --- Animation Loop ---
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            const data = elements[currentElement];
+
+            // 1. Draw "Proton Pull" Force Field (Glow)
+            // Intensity based on proton count relative to max (approx 60 for Ba)
+            const protonIntensity = Math.min(data.protons / 56, 1); 
+            const glowSize = NUCLEUS_RADIUS + (protonIntensity * 20);
+            
+            const gradient = ctx.createRadialGradient(centerX, centerY, NUCLEUS_RADIUS, centerX, centerY, glowSize);
+            gradient.addColorStop(0, `rgba(239, 68, 68, 0.8)`); // Red center
+            gradient.addColorStop(1, `rgba(239, 68, 68, 0)`);   // Fade out
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, glowSize, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // 2. Draw Nucleus
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, NUCLEUS_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444'; 
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${elements[currentElement].protons}p`, centerX, centerY);
+
+            // Standard Shells
+            const shellCount = elements[currentElement].shells.length;
+            for (let i = 0; i < shellCount; i++) {
+                const radius = (i + 1) * SHELL_SPACING + NUCLEUS_RADIUS;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            // --- Draw Visual Energy Gap Indicator (Only during excitation) ---
+            const jumpingElectron = electrons.find(e => e.state !== 'ground');
+            if (jumpingElectron) {
+                const baseRad = (shellCount) * SHELL_SPACING + NUCLEUS_RADIUS;
+                const jumpDist = SHELL_SPACING * 2 * elements[currentElement].jumpScale;
+                const targetRad = baseRad + jumpDist;
+
+                // Draw Excited Shell (Dashed)
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, targetRad, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw "Gap Ruler"
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(-Math.PI / 4); // Angle the ruler
+                
+                // Line
+                ctx.beginPath();
+                ctx.moveTo(baseRad + 5, 0);
+                ctx.lineTo(targetRad - 5, 0);
+                ctx.strokeStyle = elements[currentElement].color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Arrowheads
+                ctx.fillStyle = elements[currentElement].color;
+                ctx.font = "bold 12px Inter";
+                ctx.textAlign = "center";
+                ctx.fillText("Energy Gap", (baseRad + targetRad)/2, -10);
+
+                ctx.restore();
+            }
+
+            electrons.forEach(e => {
+                e.update();
+                e.draw(ctx);
+            });
+
+            for (let i = photons.length - 1; i >= 0; i--) {
+                photons[i].update();
+                photons[i].draw(ctx);
+                if (photons[i].life <= 0) photons.splice(i, 1);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // --- Interaction ---
+
+        function selectElement(el) {
+            currentElement = el;
+            document.querySelectorAll('.element-btn').forEach(btn => {
+                btn.classList.remove('active', 'ring-2', 'ring-white');
+                if(btn.id === `btn-${el}`) btn.classList.add('active', 'ring-2', 'ring-white');
+            });
+            document.getElementById('flame').classList.remove('flame-active');
+            initAtom(el);
+        }
+
+        document.getElementById('igniteBtn').addEventListener('click', () => {
+            if (electrons.some(e => e.state !== 'ground')) return;
+            document.getElementById('flame').classList.add('flame-active');
+            setTimeout(() => {
+                electrons.forEach(e => {
+                    if (e.isValence) e.jump();
+                });
+            }, 500);
+        });
+
+        // Init
+        selectElement('Li');
+        
+        // Fire particles
+        const fireContainer = document.querySelector('.fire');
+        for(let i=0; i<20; i++) {
+            const p = document.createElement('div');
+            p.className = 'fire-particle';
+            p.style.left = Math.random() * 100 + '%';
+            p.style.width = (Math.random() * 10 + 5) + 'px';
+            p.style.height = p.style.width;
+            p.style.animationDuration = (Math.random() * 0.5 + 0.5) + 's';
+            p.style.animationDelay = (Math.random() * 0.5) + 's';
+            fireContainer.appendChild(p);
+        }
+
+        animate();
+
+    </script>
+</body>
+</html>
